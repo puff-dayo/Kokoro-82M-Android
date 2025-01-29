@@ -1,3 +1,5 @@
+package com.example.kokoro82m.utils
+
 import android.content.Context
 import org.jetbrains.bio.npy.NpyArray
 import org.jetbrains.bio.npy.NpyFile
@@ -7,7 +9,7 @@ import java.io.InputStream
 
 class StyleLoader(private val context: Context) {
     
-    private val names = listOf(
+    val names = listOf(
         "af",
         "af_bella",
         "af_nicole",
@@ -23,21 +25,13 @@ class StyleLoader(private val context: Context) {
 
     
     private val styleResourceMap: Map<String, Int> = names.associateWith { name ->
-        val resourceName = name 
-        val resourceId = context.resources.getIdentifier(resourceName, "raw", context.packageName)
+        val resourceId = context.resources.getIdentifier(name, "raw", context.packageName)
         if (resourceId == 0) {
-            throw IllegalArgumentException("Resource '$resourceName' not found in /res/raw")
+            throw IllegalArgumentException("Resource '$name' not found in /res/raw")
         }
         resourceId
     }
 
-    /**
-     * 从 /res/raw/voices 加载指定 style 的 .npy 文件，并提取特定索引的 float32[1, 256] 向量。
-     *
-     * @param name style 名称（例如 "af_sarah"）
-     * @param index 要提取的向量索引（范围：0 到 510）
-     * @return float32[1, 256] 格式的 Tensor
-     */
     fun getStyleArray(name: String, index: Int = 0): Array<FloatArray> {
         
         val resourceId = styleResourceMap[name]
