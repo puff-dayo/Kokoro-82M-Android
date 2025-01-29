@@ -323,7 +323,7 @@ fun BasicScreen(
     ) {
         TextField(
             value = text,
-            minLines = 4,
+            minLines = 3,
             maxLines = 12,
             onValueChange = { text = it },
             label = { Text("Text to speak") },
