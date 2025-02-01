@@ -63,16 +63,14 @@ fun MixerScreen(
 
 
     var selectedStyles by remember {
-        mutableStateOf(listOf("af_sarah", "am_adam"))
+        mutableStateOf(listOf("af_sarah", "am_adam", "af_bella"))
     }
     var weights by remember {
-        mutableStateOf(mapOf("af_sarah" to 0.5f, "am_adam" to 0.5f))
+        mutableStateOf(mapOf("af_sarah" to 0.5f, "am_adam" to 0.5f, "af_bella" to 0.25f))
     }
     var interpolationMode by remember {
         mutableStateOf(InterpolationMode.LINEAR)
     }
-    var isLoading by remember { mutableStateOf(false) }
-
 
     var text by remember { mutableStateOf("This is her warm heart, her warmest kokoro, unwavering love and comfort.") }
     var speed by remember { mutableFloatStateOf(1.0f) }
@@ -144,9 +142,8 @@ fun MixerScreen(
         ) {
             Button(
                 onClick = {
-
-                    selectedStyles = listOf("af_sarah", "am_adam")
-                    weights = mapOf("af_sarah" to 0.5f, "am_adam" to 0.5f)
+                    selectedStyles = listOf("af_sarah", "am_adam", "af_bella")
+                    weights = mapOf("af_sarah" to 0.5f, "am_adam" to 0.5f, "af_bella" to 0.25f)
                 }
             ) {
                 Text("Reset")
@@ -156,8 +153,8 @@ fun MixerScreen(
 
             Button(
                 onClick = {
+                    isProcessing = true
                     scope.launch {
-                        isLoading = true
                         val mixedVector = mixStyles(
                             styleLoader = styleLoader,
                             styles = selectedStyles,
@@ -173,13 +170,14 @@ fun MixerScreen(
                             session = session,
                             phonemeConverter = phonemeConverter,
                             scope = scope
-                        )
-                        isLoading = false
+                        ) {
+                            isProcessing = false
+                        }
                     }
                 },
-                enabled = !isLoading
+                enabled = !isProcessing
             ) {
-                Text(if (isLoading) "Mixing..." else "Apply Mix")
+                Text(if (isProcessing) "Mixing..." else "Apply Mix")
             }
         }
     }
@@ -193,6 +191,7 @@ fun generateAudio(
     session: OrtSession,
     phonemeConverter: PhonemeConverter,
     scope: CoroutineScope,
+    onComplete: () -> Unit
 ) {
     scope.launch(Dispatchers.IO) {
         try {
@@ -208,6 +207,7 @@ fun generateAudio(
             Log.e("Kokoro", "Error: ${e.message}")
         } finally {
             withContext(Dispatchers.Main) {
+                onComplete()
             }
         }
     }
@@ -383,7 +383,7 @@ private fun InterpolationModeSelector(
 }
 
 enum class InterpolationMode(val displayName: String) {
-    LINEAR("Linear"),
+    LINEAR("Linear (Better)"),
     SPHERICAL("Spherical")
 }
 
