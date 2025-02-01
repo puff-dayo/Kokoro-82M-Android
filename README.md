@@ -8,10 +8,9 @@ Many features of the original model have not been implemented. This is just a si
 
 A huge thank you to the open-source projects and communities that made this project possible. Your contributions are invaluable.
 
-## Screenshots
+## Screenshot(s)
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/edd87beb-3f58-4fdb-9302-68ec329c1679" width="25%" />
-  <img src="https://github.com/user-attachments/assets/05415832-4923-4066-8dba-f4c681f1d45d" width="25%" />
+  <img src="https://github.com/user-attachments/assets/81736bf6-cc51-4aae-aeb2-daae648fb7f9" width="25%" />
 </p>
 
 
@@ -22,3 +21,8 @@ Gradle Sync and Build
 ## Prebuilt apk files
 See [release](https://github.com/puff-dayo/Kokoro-82M-Android/releases/).
 
+## TODO
+
+- Add a voice style mixer [Done]
+- Update to [kokoro-onnx v1](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0)
+- Multi language support (might need a bit refactoring...)
