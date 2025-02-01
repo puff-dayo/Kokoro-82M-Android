@@ -1,16 +1,19 @@
+import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
@@ -27,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -34,14 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.example.kokoro82m.loadModel
-import com.example.kokoro82m.playAudio
 import com.example.kokoro82m.utils.PhonemeConverter
 import com.example.kokoro82m.utils.StyleLoader
-import com.example.kokoro82m.utils.createAudio
-import com.example.kokoro82m.utils.saveAudio
+import com.example.kokoro82m.utils.createAudioFromStyleVector
+import com.example.kokoro82m.utils.playAudio
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,13 +54,14 @@ import kotlin.math.sqrt
 
 @Composable
 fun MixerScreen(
+    session: OrtSession,
+    phonemeConverter: PhonemeConverter,
     styleLoader: StyleLoader,
-    onMixApplied: (FloatArray) -> Unit 
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    
+
     var selectedStyles by remember {
         mutableStateOf(listOf("af_sarah", "am_adam"))
     }
@@ -70,7 +73,13 @@ fun MixerScreen(
     }
     var isLoading by remember { mutableStateOf(false) }
 
-    
+
+    var text by remember { mutableStateOf("This is her warm heart, her warmest kokoro, unwavering love and comfort.") }
+    var speed by remember { mutableFloatStateOf(1.0f) }
+
+    var isProcessing by remember { mutableStateOf(false) }
+    var shouldSaveFile by remember { mutableStateOf(false) }
+
     val styleNames = styleLoader.names
 
     Column(
@@ -79,7 +88,27 @@ fun MixerScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        
+        TextField(
+            value = text,
+            minLines = 3,
+            maxLines = 12,
+            onValueChange = { text = it },
+            label = { Text("Text to speak") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions.Default.copy(
+                keyboardType = KeyboardType.Text
+            )
+        )
+
+        Text("Speed: $speed", style = MaterialTheme.typography.labelLarge)
+        Slider(
+            value = speed,
+            onValueChange = { speed = it },
+            valueRange = 0.5f..2.0f,
+            steps = 5,
+            modifier = Modifier.fillMaxWidth()
+        )
+
         StyleSelector(
             styleNames = styleNames,
             selectedStyles = selectedStyles,
@@ -93,7 +122,7 @@ fun MixerScreen(
             }
         )
 
-        
+
         WeightSliders(
             selectedStyles = selectedStyles,
             weights = weights,
@@ -102,17 +131,29 @@ fun MixerScreen(
             }
         )
 
-        
+
         InterpolationModeSelector(
             currentMode = interpolationMode,
             onModeSelected = { interpolationMode = it }
         )
 
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.End
         ) {
+            Button(
+                onClick = {
+
+                    selectedStyles = listOf("af_sarah", "am_adam")
+                    weights = mapOf("af_sarah" to 0.5f, "am_adam" to 0.5f)
+                }
+            ) {
+                Text("Reset")
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
             Button(
                 onClick = {
                     scope.launch {
@@ -124,7 +165,15 @@ fun MixerScreen(
                             mode = interpolationMode,
                             context = context
                         )
-                        onMixApplied(mixedVector)
+                        generateAudio(
+                            text = text,
+                            style = mixedVector,
+                            speed = speed,
+                            shouldSaveFile = shouldSaveFile,
+                            session = session,
+                            phonemeConverter = phonemeConverter,
+                            scope = scope
+                        )
                         isLoading = false
                     }
                 },
@@ -132,15 +181,33 @@ fun MixerScreen(
             ) {
                 Text(if (isLoading) "Mixing..." else "Apply Mix")
             }
+        }
+    }
+}
 
-            Button(
-                onClick = {
-                    
-                    selectedStyles = listOf("af_sarah", "am_adam")
-                    weights = mapOf("af_sarah" to 0.5f, "am_adam" to 0.5f)
-                }
-            ) {
-                Text("Reset")
+fun generateAudio(
+    text: String,
+    style: Array<FloatArray>,
+    speed: Float,
+    shouldSaveFile: Boolean,
+    session: OrtSession,
+    phonemeConverter: PhonemeConverter,
+    scope: CoroutineScope,
+) {
+    scope.launch(Dispatchers.IO) {
+        try {
+            val phonemes = phonemeConverter.phonemize(text)
+            val (audio, _) = createAudioFromStyleVector(
+                phonemes = phonemes,
+                voice = style,
+                speed = speed,
+                session = session
+            )
+            playAudio(audio, scope) {}
+        } catch (e: Exception) {
+            Log.e("Kokoro", "Error: ${e.message}")
+        } finally {
+            withContext(Dispatchers.Main) {
             }
         }
     }
@@ -153,44 +220,47 @@ private suspend fun mixStyles(
     weights: Map<String, Float>,
     mode: InterpolationMode,
     context: Context
-): FloatArray = withContext(Dispatchers.Default) {
+): Array<FloatArray> = withContext(Dispatchers.Default) {
     require(styles.isNotEmpty()) { "At least one style must be selected" }
     require(styles.all { it in weights }) { "All styles must have weights" }
 
-    
+
     val styleVectors = styles.map { styleName ->
-        styleLoader.getStyleArray(styleName).first() 
+        styleLoader.getStyleArray(styleName).first()
     }
 
-    
+
     val totalWeight = weights.values.sum()
     val normalizedWeights = weights.values.map { it / totalWeight }
 
-    
+
     when (mode) {
         InterpolationMode.LINEAR -> linearInterpolation(styleVectors, normalizedWeights)
         InterpolationMode.SPHERICAL -> sphericalInterpolation(styleVectors, normalizedWeights)
     }
 }
 
-private fun linearInterpolation(vectors: List<FloatArray>, weights: List<Float>): FloatArray {
-    return FloatArray(256) { i ->
-        vectors.mapIndexed { idx, vec -> vec[i] * weights[idx] }.sum()
-    }
+private fun linearInterpolation(vectors: List<FloatArray>, weights: List<Float>): Array<FloatArray> {
+    return arrayOf(
+        FloatArray(256) { i ->
+            vectors.mapIndexed { idx, vec -> vec[i] * weights[idx] }.sum()
+        }
+    )
 }
 
-private fun sphericalInterpolation(vectors: List<FloatArray>, weights: List<Float>): FloatArray {
-    
+private fun sphericalInterpolation(vectors: List<FloatArray>, weights: List<Float>): Array<FloatArray> {
     val normalizedVectors = vectors.map { vec ->
         val norm = sqrt(vec.sumOf { it.toDouble().pow(2) })
         vec.map { (it / norm).toFloat() }.toFloatArray()
     }
 
-    return FloatArray(256) { i ->
-        val components = normalizedVectors.map { it[i] }
-        val dotProduct = components.zip(weights) { c, w -> c * w }.sum()
-        dotProduct / components.size.toFloat()
-    }
+    return arrayOf(
+        FloatArray(256) { i ->
+            normalizedVectors.mapIndexed { idx, vec ->
+                vec[i] * weights[idx]
+            }.sum()
+        }
+    )
 }
 
 
@@ -207,7 +277,7 @@ private fun StyleSelector(
     Column {
         Text("Selected Styles:", style = MaterialTheme.typography.labelLarge)
 
-        
+
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -222,17 +292,12 @@ private fun StyleSelector(
                             contentDescription = "Remove"
                         )
                     }
-
-
-
-
-
-
                 )
             }
         }
 
-        
+        Spacer(modifier = Modifier.height(8.dp))
+
         ExposedDropdownMenuBox(
             expanded = expanded,
             onExpandedChange = { expanded = !expanded }
@@ -323,50 +388,13 @@ enum class InterpolationMode(val displayName: String) {
 }
 
 
-private fun generateAudio(
-    phonemeConverter: PhonemeConverter,
-    text: String,
-    style: String,
-    speed: Float,
-    context: Context,
-    scope: CoroutineScope,
-    shouldSave: Boolean,
-    onComplete: () -> Unit
-) {
-    scope.launch(Dispatchers.IO) {
-        try {
-            val phonemes = phonemeConverter.phonemize(text)
-            Log.d("Kokoro", "Phonemes: $phonemes")
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Phonemes: $phonemes", Toast.LENGTH_LONG).show()
-            }
-
-            val session = loadModel(context)
-
-            val (audioData, _) = createAudio(
-                voice = style, phonemes = phonemes, speed = speed, context = context,
-                session = session
-            )
-
-            playAudio(
-                audioData, scope,
-                onComplete = onComplete
-            )
-
-            if (shouldSave) {
-                saveAudio(audioData, context)
-            }
-
-            session.close()
-        } catch (e: Exception) {
-            Log.e("Kokoro", "Error: ${e.message}")
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        } finally {
-            withContext(Dispatchers.Main) {
-                onComplete()
-            }
-        }
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun MixerPreview() {
+//    OnnxRuntimeManager.initialize(LocalContext.current)
+//
+//    MixerScreen(
+//        styleLoader = StyleLoader(LocalContext.current),
+//        session = OnnxRuntimeManager.getSession()
+//    )
+//}

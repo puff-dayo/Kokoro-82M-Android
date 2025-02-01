@@ -68,6 +68,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     implementation(libs.material3)
     implementation("com.github.medavox:IPA-Transcribers:v0.2")
+
+    val lifecycle_version = "2.8.7"
+    val arch_version = "2.2.0"
+
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycle_version")
 }
 
 tasks.withType<JavaCompile> {
